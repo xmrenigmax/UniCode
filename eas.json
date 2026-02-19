@@ -14,13 +14,13 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_DOMAIN": "YOUR_SERVER_DOMAIN_HERE"
+        "EXPO_PUBLIC_DOMAIN": "https://v0-uni-code.vercel.app/"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_DOMAIN": "YOUR_SERVER_DOMAIN_HERE"
+        "EXPO_PUBLIC_DOMAIN": "https://v0-uni-code.vercel.app/"
       }
     }
   },
