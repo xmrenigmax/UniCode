@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   View,
   Text,
-  TextInput,
   Pressable,
   StyleSheet,
   KeyboardAvoidingView,
@@ -16,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/lib/useTheme";
 import { useCourse } from "@/lib/CourseContext";
+import { SearchableDropdown } from "@/components/SearchableDropdown";
 
 export default function OnboardingScreen() {
   const { colors, isDark } = useTheme();
@@ -36,9 +36,9 @@ export default function OnboardingScreen() {
     }
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    createNewCourse(university.trim(), courseTitle.trim(), numYears);
+    await createNewCourse(university.trim(), courseTitle.trim(), numYears);
     router.replace("/(tabs)");
   };
 
@@ -105,33 +105,17 @@ export default function OnboardingScreen() {
                 Your University
               </Text>
               <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                Which university are you studying at?
+                Search and select your university
               </Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  {
-                    backgroundColor: colors.inputBackground,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="search"
-                  size={20}
-                  color={colors.textTertiary}
-                />
-                <TextInput
-                  style={[styles.input, { color: colors.text }]}
-                  placeholder="e.g. University of Manchester"
-                  placeholderTextColor={colors.textTertiary}
-                  value={university}
-                  onChangeText={setUniversity}
-                  autoFocus
-                  returnKeyType="next"
-                  onSubmitEditing={handleNext}
-                />
-              </View>
+              <SearchableDropdown
+                placeholder="Search universities..."
+                value={university}
+                onSelect={setUniversity}
+                endpoint="/api/universities"
+                icon="school-outline"
+                autoFocus
+                testID="university-search"
+              />
               <Pressable
                 onPress={handleNext}
                 disabled={!university.trim()}
@@ -163,33 +147,18 @@ export default function OnboardingScreen() {
                 Your Course
               </Text>
               <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                What degree are you studying?
+                Search and select your degree programme
               </Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  {
-                    backgroundColor: colors.inputBackground,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="document-text-outline"
-                  size={20}
-                  color={colors.textTertiary}
-                />
-                <TextInput
-                  style={[styles.input, { color: colors.text }]}
-                  placeholder="e.g. BSc Computer Science"
-                  placeholderTextColor={colors.textTertiary}
-                  value={courseTitle}
-                  onChangeText={setCourseTitle}
-                  autoFocus
-                  returnKeyType="next"
-                  onSubmitEditing={handleNext}
-                />
-              </View>
+              <SearchableDropdown
+                placeholder="Search courses..."
+                value={courseTitle}
+                onSelect={setCourseTitle}
+                endpoint="/api/courses"
+                queryParams={{ university }}
+                icon="book-outline"
+                autoFocus
+                testID="course-search"
+              />
               <Pressable
                 onPress={handleNext}
                 disabled={!courseTitle.trim()}
@@ -269,9 +238,23 @@ export default function OnboardingScreen() {
                   </Pressable>
                 ))}
               </View>
-              <View style={[styles.infoCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderLight }]}>
-                <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
-                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+              <View
+                style={[
+                  styles.infoCard,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.borderLight,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="information-circle-outline"
+                  size={20}
+                  color={colors.primary}
+                />
+                <Text
+                  style={[styles.infoText, { color: colors.textSecondary }]}
+                >
                   {numYears === 3
                     ? "Year 1: 0%, Year 2: 40%, Year 3: 60% weighting"
                     : "Year 1: 0%, Year 2: 20%, Year 3: 30%, Year 4: 50% weighting"}
@@ -300,12 +283,8 @@ export default function OnboardingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  flex: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  flex: { flex: 1 },
   headerGradient: {
     paddingBottom: 30,
     paddingHorizontal: 20,
@@ -351,21 +330,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 22,
     marginBottom: 12,
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    height: 56,
-    width: "100%",
-    gap: 10,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    fontFamily: "Inter_400Regular",
   },
   primaryButton: {
     flexDirection: "row",

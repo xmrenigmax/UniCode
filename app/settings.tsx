@@ -15,11 +15,13 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/lib/useTheme";
 import { useCourse } from "@/lib/CourseContext";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function SettingsScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { course, setCourseInfo, resetCourse, addYear } = useCourse();
+  const { user, logout } = useAuth();
 
   const [editingUni, setEditingUni] = useState(false);
   const [editingCourse, setEditingCourse] = useState(false);
@@ -240,6 +242,56 @@ export default function SettingsScreen() {
             </Text>
           </Pressable>
         </View>
+
+        {user && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+              ACCOUNT
+            </Text>
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: colors.card, borderColor: colors.borderLight },
+              ]}
+            >
+              <View style={[styles.settingRow, { borderBottomColor: colors.borderLight }]}>
+                <View style={styles.settingLeft}>
+                  <Ionicons
+                    name="person-outline"
+                    size={20}
+                    color={colors.primary}
+                  />
+                  <Text style={[styles.settingLabel, { color: colors.text }]}>
+                    Name
+                  </Text>
+                </View>
+                <Text
+                  style={[styles.settingValue, { color: colors.textSecondary }]}
+                >
+                  {user.displayName}
+                </Text>
+              </View>
+              <View style={styles.settingRow}>
+                <View style={styles.settingLeft}>
+                  <Ionicons
+                    name="mail-outline"
+                    size={20}
+                    color={colors.primary}
+                  />
+                  <Text style={[styles.settingLabel, { color: colors.text }]}>
+                    Email
+                  </Text>
+                </View>
+                <Text
+                  style={[styles.settingValue, { color: colors.textSecondary }]}
+                  numberOfLines={1}
+                >
+                  {user.email}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>

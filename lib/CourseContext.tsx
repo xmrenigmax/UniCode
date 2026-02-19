@@ -12,9 +12,10 @@ import {
   type AcademicYear,
   type Module,
   type Assessment,
-  generateId,
 } from "./types";
-import { saveCourse, loadCourse, deleteCourse } from "./storage";
+import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
+import { useAuth } from "@/lib/AuthContext";
+import { fetch } from "expo/fetch";
 
 interface CourseContextValue {
   course: Course | null;
@@ -24,16 +25,39 @@ interface CourseContextValue {
   updateYear: (yearId: string, updates: Partial<AcademicYear>) => void;
   removeYear: (yearId: string) => void;
   addModule: (yearId: string, name: string, credits: number) => void;
-  updateModule: (yearId: string, moduleId: string, updates: Partial<Module>) => void;
+  updateModule: (
+    yearId: string,
+    moduleId: string,
+    updates: Partial<Module>,
+  ) => void;
   removeModule: (yearId: string, moduleId: string) => void;
-  addAssessment: (yearId: string, moduleId: string, name: string, weight: number) => void;
-  updateAssessment: (yearId: string, moduleId: string, assessmentId: string, updates: Partial<Assessment>) => void;
-  removeAssessment: (yearId: string, moduleId: string, assessmentId: string) => void;
-  setModuleTarget: (yearId: string, moduleId: string, target: number | null) => void;
+  addAssessment: (
+    yearId: string,
+    moduleId: string,
+    name: string,
+    weight: number,
+  ) => void;
+  updateAssessment: (
+    yearId: string,
+    moduleId: string,
+    assessmentId: string,
+    updates: Partial<Assessment>,
+  ) => void;
+  removeAssessment: (
+    yearId: string,
+    moduleId: string,
+    assessmentId: string,
+  ) => void;
+  setModuleTarget: (
+    yearId: string,
+    moduleId: string,
+    target: number | null,
+  ) => void;
   setYearTarget: (yearId: string, target: number | null) => void;
   setCourseTarget: (target: number | null) => void;
   resetCourse: () => void;
   createNewCourse: (uni: string, title: string, numYears: number) => void;
+  refreshCourse: () => Promise<void>;
 }
 
 const CourseContext = createContext<CourseContextValue | null>(null);
@@ -41,238 +65,334 @@ const CourseContext = createContext<CourseContextValue | null>(null);
 export function CourseProvider({ children }: { children: ReactNode }) {
   const [course, setCourse] = useState<Course | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
+
+  const fetchCourse = useCallback(async () => {
+    if (!user) {
+      setCourse(null);
+      setIsLoading(false);
+      return;
+    }
+    try {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/course", baseUrl);
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setCourse(data);
+      } else {
+        setCourse(null);
+      }
+    } catch {
+      setCourse(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
 
   useEffect(() => {
-    loadCourse().then((c) => {
-      setCourse(c);
-      setIsLoading(false);
-    });
-  }, []);
+    fetchCourse();
+  }, [fetchCourse]);
 
-  const persist = useCallback((updated: Course) => {
-    setCourse(updated);
-    saveCourse(updated);
-  }, []);
+  const refreshCourse = useCallback(async () => {
+    await fetchCourse();
+  }, [fetchCourse]);
 
   const createNewCourse = useCallback(
-    (uni: string, title: string, numYears: number) => {
-      const defaultWeights: Record<number, number[]> = {
-        3: [0, 40, 60],
-        4: [0, 20, 30, 50],
-      };
-      const weights = defaultWeights[numYears] || Array(numYears).fill(100 / numYears);
-
-      const years: AcademicYear[] = Array.from({ length: numYears }, (_, i) => ({
-        id: generateId(),
-        label: `Year ${i + 1}`,
-        yearNumber: i + 1,
-        weight: weights[i],
-        modules: [],
-        targetGrade: null,
-      }));
-
-      const newCourse: Course = {
-        id: generateId(),
-        universityName: uni,
-        courseTitle: title,
-        years,
-        targetGrade: null,
-        createdAt: new Date().toISOString(),
-      };
-      persist(newCourse);
+    async (uni: string, title: string, numYears: number) => {
+      try {
+        const res = await apiRequest("POST", "/api/course", {
+          universityName: uni,
+          courseTitle: title,
+          numYears,
+        });
+        const data = await res.json();
+        setCourse(data);
+      } catch (err) {
+        console.error("Create course error:", err);
+      }
     },
-    [persist],
+    [],
   );
 
   const setCourseInfo = useCallback(
-    (uni: string, title: string) => {
+    async (uni: string, title: string) => {
       if (!course) return;
-      persist({ ...course, universityName: uni, courseTitle: title });
+      try {
+        await apiRequest("PUT", "/api/course", {
+          universityName: uni,
+          courseTitle: title,
+        });
+        setCourse((prev) =>
+          prev
+            ? { ...prev, universityName: uni, courseTitle: title }
+            : null,
+        );
+      } catch (err) {
+        console.error(err);
+      }
     },
-    [course, persist],
+    [course],
   );
 
   const addYear = useCallback(
-    (label: string, weight: number) => {
+    async (label: string, weight: number) => {
       if (!course) return;
-      const newYear: AcademicYear = {
-        id: generateId(),
-        label,
-        yearNumber: course.years.length + 1,
-        weight,
-        modules: [],
-        targetGrade: null,
-      };
-      persist({ ...course, years: [...course.years, newYear] });
+      try {
+        const res = await apiRequest("POST", `/api/years/${course.id}/add`, {
+          label,
+          weight,
+        });
+        const year = await res.json();
+        setCourse((prev) =>
+          prev ? { ...prev, years: [...prev.years, year] } : null,
+        );
+      } catch (err) {
+        console.error(err);
+      }
     },
-    [course, persist],
+    [course],
   );
 
   const updateYear = useCallback(
-    (yearId: string, updates: Partial<AcademicYear>) => {
+    async (yearId: string, updates: Partial<AcademicYear>) => {
       if (!course) return;
-      persist({
-        ...course,
-        years: course.years.map((y) =>
-          y.id === yearId ? { ...y, ...updates } : y,
-        ),
-      });
+      try {
+        await apiRequest("PUT", `/api/years/${yearId}`, updates);
+        setCourse((prev) =>
+          prev
+            ? {
+                ...prev,
+                years: prev.years.map((y) =>
+                  y.id === yearId ? { ...y, ...updates } : y,
+                ),
+              }
+            : null,
+        );
+      } catch (err) {
+        console.error(err);
+      }
     },
-    [course, persist],
+    [course],
   );
 
   const removeYear = useCallback(
     (yearId: string) => {
       if (!course) return;
-      persist({
-        ...course,
-        years: course.years.filter((y) => y.id !== yearId),
-      });
+      setCourse((prev) =>
+        prev
+          ? { ...prev, years: prev.years.filter((y) => y.id !== yearId) }
+          : null,
+      );
     },
-    [course, persist],
+    [course],
   );
 
   const addModule = useCallback(
-    (yearId: string, name: string, credits: number) => {
+    async (yearId: string, name: string, credits: number) => {
       if (!course) return;
-      const newModule: Module = {
-        id: generateId(),
-        name,
-        credits,
-        assessments: [],
-        targetGrade: null,
-      };
-      persist({
-        ...course,
-        years: course.years.map((y) =>
-          y.id === yearId ? { ...y, modules: [...y.modules, newModule] } : y,
-        ),
-      });
+      try {
+        const res = await apiRequest("POST", `/api/years/${yearId}/modules`, {
+          name,
+          credits,
+        });
+        const mod = await res.json();
+        setCourse((prev) =>
+          prev
+            ? {
+                ...prev,
+                years: prev.years.map((y) =>
+                  y.id === yearId
+                    ? { ...y, modules: [...y.modules, mod] }
+                    : y,
+                ),
+              }
+            : null,
+        );
+      } catch (err) {
+        console.error(err);
+      }
     },
-    [course, persist],
+    [course],
   );
 
   const updateModule = useCallback(
-    (yearId: string, moduleId: string, updates: Partial<Module>) => {
+    async (yearId: string, moduleId: string, updates: Partial<Module>) => {
       if (!course) return;
-      persist({
-        ...course,
-        years: course.years.map((y) =>
-          y.id === yearId
+      try {
+        await apiRequest("PUT", `/api/modules/${moduleId}`, updates);
+        setCourse((prev) =>
+          prev
             ? {
-                ...y,
-                modules: y.modules.map((m) =>
-                  m.id === moduleId ? { ...m, ...updates } : m,
+                ...prev,
+                years: prev.years.map((y) =>
+                  y.id === yearId
+                    ? {
+                        ...y,
+                        modules: y.modules.map((m) =>
+                          m.id === moduleId ? { ...m, ...updates } : m,
+                        ),
+                      }
+                    : y,
                 ),
               }
-            : y,
-        ),
-      });
+            : null,
+        );
+      } catch (err) {
+        console.error(err);
+      }
     },
-    [course, persist],
+    [course],
   );
 
   const removeModule = useCallback(
-    (yearId: string, moduleId: string) => {
+    async (yearId: string, moduleId: string) => {
       if (!course) return;
-      persist({
-        ...course,
-        years: course.years.map((y) =>
-          y.id === yearId
-            ? { ...y, modules: y.modules.filter((m) => m.id !== moduleId) }
-            : y,
-        ),
-      });
+      try {
+        await apiRequest("DELETE", `/api/modules/${moduleId}`);
+        setCourse((prev) =>
+          prev
+            ? {
+                ...prev,
+                years: prev.years.map((y) =>
+                  y.id === yearId
+                    ? {
+                        ...y,
+                        modules: y.modules.filter((m) => m.id !== moduleId),
+                      }
+                    : y,
+                ),
+              }
+            : null,
+        );
+      } catch (err) {
+        console.error(err);
+      }
     },
-    [course, persist],
+    [course],
   );
 
   const addAssessment = useCallback(
-    (yearId: string, moduleId: string, name: string, weight: number) => {
+    async (
+      yearId: string,
+      moduleId: string,
+      name: string,
+      weight: number,
+    ) => {
       if (!course) return;
-      const newAssessment: Assessment = {
-        id: generateId(),
-        name,
-        weight,
-        grade: null,
-        completed: false,
-      };
-      persist({
-        ...course,
-        years: course.years.map((y) =>
-          y.id === yearId
+      try {
+        const res = await apiRequest(
+          "POST",
+          `/api/modules/${moduleId}/assessments`,
+          { name, weight },
+        );
+        const assessment = await res.json();
+        setCourse((prev) =>
+          prev
             ? {
-                ...y,
-                modules: y.modules.map((m) =>
-                  m.id === moduleId
-                    ? { ...m, assessments: [...m.assessments, newAssessment] }
-                    : m,
+                ...prev,
+                years: prev.years.map((y) =>
+                  y.id === yearId
+                    ? {
+                        ...y,
+                        modules: y.modules.map((m) =>
+                          m.id === moduleId
+                            ? {
+                                ...m,
+                                assessments: [...m.assessments, assessment],
+                              }
+                            : m,
+                        ),
+                      }
+                    : y,
                 ),
               }
-            : y,
-        ),
-      });
+            : null,
+        );
+      } catch (err) {
+        console.error(err);
+      }
     },
-    [course, persist],
+    [course],
   );
 
   const updateAssessment = useCallback(
-    (
+    async (
       yearId: string,
       moduleId: string,
       assessmentId: string,
       updates: Partial<Assessment>,
     ) => {
       if (!course) return;
-      persist({
-        ...course,
-        years: course.years.map((y) =>
-          y.id === yearId
+      try {
+        await apiRequest("PUT", `/api/assessments/${assessmentId}`, updates);
+        setCourse((prev) =>
+          prev
             ? {
-                ...y,
-                modules: y.modules.map((m) =>
-                  m.id === moduleId
+                ...prev,
+                years: prev.years.map((y) =>
+                  y.id === yearId
                     ? {
-                        ...m,
-                        assessments: m.assessments.map((a) =>
-                          a.id === assessmentId ? { ...a, ...updates } : a,
+                        ...y,
+                        modules: y.modules.map((m) =>
+                          m.id === moduleId
+                            ? {
+                                ...m,
+                                assessments: m.assessments.map((a) =>
+                                  a.id === assessmentId
+                                    ? { ...a, ...updates }
+                                    : a,
+                                ),
+                              }
+                            : m,
                         ),
                       }
-                    : m,
+                    : y,
                 ),
               }
-            : y,
-        ),
-      });
+            : null,
+        );
+      } catch (err) {
+        console.error(err);
+      }
     },
-    [course, persist],
+    [course],
   );
 
   const removeAssessment = useCallback(
-    (yearId: string, moduleId: string, assessmentId: string) => {
+    async (yearId: string, moduleId: string, assessmentId: string) => {
       if (!course) return;
-      persist({
-        ...course,
-        years: course.years.map((y) =>
-          y.id === yearId
+      try {
+        await apiRequest("DELETE", `/api/assessments/${assessmentId}`);
+        setCourse((prev) =>
+          prev
             ? {
-                ...y,
-                modules: y.modules.map((m) =>
-                  m.id === moduleId
+                ...prev,
+                years: prev.years.map((y) =>
+                  y.id === yearId
                     ? {
-                        ...m,
-                        assessments: m.assessments.filter(
-                          (a) => a.id !== assessmentId,
+                        ...y,
+                        modules: y.modules.map((m) =>
+                          m.id === moduleId
+                            ? {
+                                ...m,
+                                assessments: m.assessments.filter(
+                                  (a) => a.id !== assessmentId,
+                                ),
+                              }
+                            : m,
                         ),
                       }
-                    : m,
+                    : y,
                 ),
               }
-            : y,
-        ),
-      });
+            : null,
+        );
+      } catch (err) {
+        console.error(err);
+      }
     },
-    [course, persist],
+    [course],
   );
 
   const setModuleTarget = useCallback(
@@ -290,16 +410,27 @@ export function CourseProvider({ children }: { children: ReactNode }) {
   );
 
   const setCourseTarget = useCallback(
-    (target: number | null) => {
+    async (target: number | null) => {
       if (!course) return;
-      persist({ ...course, targetGrade: target });
+      try {
+        await apiRequest("PUT", "/api/course", { targetGrade: target });
+        setCourse((prev) =>
+          prev ? { ...prev, targetGrade: target } : null,
+        );
+      } catch (err) {
+        console.error(err);
+      }
     },
-    [course, persist],
+    [course],
   );
 
-  const resetCourse = useCallback(() => {
-    setCourse(null);
-    deleteCourse();
+  const resetCourse = useCallback(async () => {
+    try {
+      await apiRequest("DELETE", "/api/course");
+      setCourse(null);
+    } catch (err) {
+      console.error(err);
+    }
   }, []);
 
   const value = useMemo(
@@ -321,6 +452,7 @@ export function CourseProvider({ children }: { children: ReactNode }) {
       setCourseTarget,
       resetCourse,
       createNewCourse,
+      refreshCourse,
     }),
     [
       course,
@@ -340,6 +472,7 @@ export function CourseProvider({ children }: { children: ReactNode }) {
       setCourseTarget,
       resetCourse,
       createNewCourse,
+      refreshCourse,
     ],
   );
 
