@@ -502,6 +502,36 @@ app.get("/api/health", (_req: Request, res: Response) => {
   return res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+// --- Admin verification ---
+app.post("/api/admin/verify", (req: Request, res: Response) => {
+  const adminKey = process.env.ADMIN_KEY;
+  if (!adminKey) {
+    return res.status(503).json({ message: "Admin key not configured" });
+  }
+  const { key } = req.body;
+  if (key === adminKey) {
+    return res.json({ verified: true });
+  }
+  return res.status(403).json({ message: "Invalid admin key" });
+});
+
+// --- Download redirects ---
+app.get("/api/download/android", (_req: Request, res: Response) => {
+  const url = process.env.ANDROID_APK_URL;
+  if (!url) {
+    return res.status(404).json({ message: "Android APK not yet available. Build with: eas build --platform android --profile preview" });
+  }
+  return res.redirect(302, url);
+});
+
+app.get("/api/download/ios", (_req: Request, res: Response) => {
+  const url = process.env.IOS_BUILD_URL;
+  if (!url) {
+    return res.status(404).json({ message: "iOS build not yet available. Build with: eas build --platform ios --profile preview" });
+  }
+  return res.redirect(302, url);
+});
+
 // --- Landing page ---
 app.get("/", (_req: Request, res: Response) => {
   const html = `<!DOCTYPE html>
@@ -798,8 +828,8 @@ app.get("/", (_req: Request, res: Response) => {
       </a>
       <div class="nav-links">
         <a href="#download">Download</a>
-        <a href="#test">API Test</a>
         <a href="#features">Features</a>
+        <a href="#test">Admin</a>
       </div>
     </div>
   </nav>
@@ -819,30 +849,17 @@ app.get("/", (_req: Request, res: Response) => {
         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
         Download App
       </a>
-      <a href="#test" class="btn btn-outline">
+      <a href="#features" class="btn btn-outline">
         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        Test Backend
+        Learn More
       </a>
     </div>
   </section>
 
   <section class="section" id="download">
     <h2 class="section-title">Download UniGrade</h2>
-    <p class="section-subtitle">Get the app on your device. Currently in development -- builds available via Expo.</p>
+    <p class="section-subtitle">Get the app on your device.</p>
     <div class="download-grid">
-      <div class="download-card">
-        <div class="download-card-header">
-          <div class="download-card-icon ios">
-            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-          </div>
-          <div>
-            <h3>iOS (iPhone)</h3>
-            <p style="color:var(--text-muted);font-size:13px;margin:0">Apple App Store</p>
-          </div>
-        </div>
-        <p>Coming soon to the App Store. Build locally with <code style="background:var(--surface-elevated);padding:2px 6px;border-radius:4px;font-size:13px">eas build --platform ios</code></p>
-        <a href="#" class="btn btn-outline btn-sm" style="align-self:flex-start;opacity:0.5;pointer-events:none">Coming Soon</a>
-      </div>
       <div class="download-card">
         <div class="download-card-header">
           <div class="download-card-icon android">
@@ -850,87 +867,115 @@ app.get("/", (_req: Request, res: Response) => {
           </div>
           <div>
             <h3>Android (APK)</h3>
-            <p style="color:var(--text-muted);font-size:13px;margin:0">Google Play Store</p>
+            <p style="color:var(--text-muted);font-size:13px;margin:0">Download and install directly</p>
           </div>
         </div>
-        <p>Coming soon to Google Play. Build locally with <code style="background:var(--surface-elevated);padding:2px 6px;border-radius:4px;font-size:13px">eas build --platform android</code></p>
-        <a href="#" class="btn btn-outline btn-sm" style="align-self:flex-start;opacity:0.5;pointer-events:none">Coming Soon</a>
+        <p>Download the APK to install UniGrade on your Android device. You may need to enable "Install from unknown sources" in your settings.</p>
+        <a href="/api/download/android" class="btn btn-primary btn-sm" style="align-self:flex-start" id="btn-android">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Download APK
+        </a>
+      </div>
+      <div class="download-card">
+        <div class="download-card-header">
+          <div class="download-card-icon ios">
+            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+          </div>
+          <div>
+            <h3>iOS (iPhone)</h3>
+            <p style="color:var(--text-muted);font-size:13px;margin:0">TestFlight / App Store</p>
+          </div>
+        </div>
+        <p>iOS builds require TestFlight for testing or the App Store for release. An Apple Developer Account ($99/year) is needed.</p>
+        <a href="/api/download/ios" class="btn btn-outline btn-sm" style="align-self:flex-start" id="btn-ios">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Download iOS Build
+        </a>
       </div>
     </div>
   </section>
 
   <section class="section" id="test">
-    <h2 class="section-title">Backend API Test</h2>
-    <p class="section-subtitle">Run live tests against the API to verify database connectivity, auth, and data endpoints.</p>
+    <h2 class="section-title">Admin Panel</h2>
+    <p class="section-subtitle">Enter your admin key to access backend diagnostics.</p>
 
-    <div class="test-panel">
-      <div class="test-panel-header">
-        <h3>Endpoint Tests</h3>
-        <span class="test-summary" id="test-summary">0 / 5 passed</span>
-      </div>
-      <div class="test-list">
-        <div class="test-item" data-test="health">
-          <div class="test-item-left">
-            <span class="test-method get">GET</span>
-            <span class="test-endpoint">/api/health</span>
-          </div>
-          <div class="test-status status-idle" id="status-health">
-            <div class="status-dot"></div>
-            <span>Idle</span>
-          </div>
-        </div>
-        <div class="test-item" data-test="register">
-          <div class="test-item-left">
-            <span class="test-method post">POST</span>
-            <span class="test-endpoint">/api/auth/register</span>
-          </div>
-          <div class="test-status status-idle" id="status-register">
-            <div class="status-dot"></div>
-            <span>Idle</span>
-          </div>
-        </div>
-        <div class="test-item" data-test="login">
-          <div class="test-item-left">
-            <span class="test-method post">POST</span>
-            <span class="test-endpoint">/api/auth/login</span>
-          </div>
-          <div class="test-status status-idle" id="status-login">
-            <div class="status-dot"></div>
-            <span>Idle</span>
-          </div>
-        </div>
-        <div class="test-item" data-test="me">
-          <div class="test-item-left">
-            <span class="test-method get">GET</span>
-            <span class="test-endpoint">/api/auth/me</span>
-          </div>
-          <div class="test-status status-idle" id="status-me">
-            <div class="status-dot"></div>
-            <span>Idle</span>
-          </div>
-        </div>
-        <div class="test-item" data-test="universities">
-          <div class="test-item-left">
-            <span class="test-method get">GET</span>
-            <span class="test-endpoint">/api/universities?q=oxford</span>
-          </div>
-          <div class="test-status status-idle" id="status-universities">
-            <div class="status-dot"></div>
-            <span>Idle</span>
-          </div>
-        </div>
-      </div>
-      <div class="test-actions">
-        <button class="btn btn-primary btn-sm" id="run-tests" onclick="runAllTests()">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          Run All Tests
-        </button>
-        <button class="btn btn-outline btn-sm" onclick="clearTests()">Clear</button>
-      </div>
+    <div id="admin-gate" style="display:flex;gap:10px;align-items:center;margin-bottom:24px">
+      <input type="password" id="admin-key-input" placeholder="Enter admin key..." 
+        style="flex:1;padding:10px 14px;border-radius:10px;border:1px solid var(--border-light);background:var(--surface);color:var(--text);font-family:inherit;font-size:14px;outline:none" />
+      <button class="btn btn-primary btn-sm" onclick="unlockAdmin()">Unlock</button>
     </div>
+    <p id="admin-error" style="color:var(--danger);font-size:13px;display:none;margin-bottom:16px"></p>
 
-    <div class="log-area" id="log-area">
-      <div class="log-line info">Ready to run tests. Click "Run All Tests" to begin.</div>
+    <div id="admin-panel" style="display:none">
+      <div class="test-panel">
+        <div class="test-panel-header">
+          <h3>Endpoint Tests</h3>
+          <span class="test-summary" id="test-summary">0 / 5 passed</span>
+        </div>
+        <div class="test-list">
+          <div class="test-item" data-test="health">
+            <div class="test-item-left">
+              <span class="test-method get">GET</span>
+              <span class="test-endpoint">/api/health</span>
+            </div>
+            <div class="test-status status-idle" id="status-health">
+              <div class="status-dot"></div>
+              <span>Idle</span>
+            </div>
+          </div>
+          <div class="test-item" data-test="register">
+            <div class="test-item-left">
+              <span class="test-method post">POST</span>
+              <span class="test-endpoint">/api/auth/register</span>
+            </div>
+            <div class="test-status status-idle" id="status-register">
+              <div class="status-dot"></div>
+              <span>Idle</span>
+            </div>
+          </div>
+          <div class="test-item" data-test="login">
+            <div class="test-item-left">
+              <span class="test-method post">POST</span>
+              <span class="test-endpoint">/api/auth/login</span>
+            </div>
+            <div class="test-status status-idle" id="status-login">
+              <div class="status-dot"></div>
+              <span>Idle</span>
+            </div>
+          </div>
+          <div class="test-item" data-test="me">
+            <div class="test-item-left">
+              <span class="test-method get">GET</span>
+              <span class="test-endpoint">/api/auth/me</span>
+            </div>
+            <div class="test-status status-idle" id="status-me">
+              <div class="status-dot"></div>
+              <span>Idle</span>
+            </div>
+          </div>
+          <div class="test-item" data-test="universities">
+            <div class="test-item-left">
+              <span class="test-method get">GET</span>
+              <span class="test-endpoint">/api/universities?q=oxford</span>
+            </div>
+            <div class="test-status status-idle" id="status-universities">
+              <div class="status-dot"></div>
+              <span>Idle</span>
+            </div>
+          </div>
+        </div>
+        <div class="test-actions">
+          <button class="btn btn-primary btn-sm" id="run-tests" onclick="runAllTests()">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Run All Tests
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="clearTests()">Clear</button>
+        </div>
+      </div>
+
+      <div class="log-area" id="log-area">
+        <div class="log-line info">Ready to run tests. Click "Run All Tests" to begin.</div>
+      </div>
     </div>
   </section>
 
@@ -966,6 +1011,35 @@ app.get("/", (_req: Request, res: Response) => {
     let passed = 0;
     let testEmail = 'test_' + Date.now() + '@unigrade-test.com';
     let testPassword = 'TestPass123';
+
+    async function unlockAdmin() {
+      const key = document.getElementById('admin-key-input').value;
+      const errEl = document.getElementById('admin-error');
+      errEl.style.display = 'none';
+      if (!key) { errEl.textContent = 'Please enter your admin key.'; errEl.style.display = 'block'; return; }
+      try {
+        const r = await fetch(BASE + '/api/admin/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key })
+        });
+        const d = await r.json();
+        if (d.verified) {
+          document.getElementById('admin-gate').style.display = 'none';
+          document.getElementById('admin-panel').style.display = 'block';
+          errEl.style.display = 'none';
+        } else {
+          errEl.textContent = d.message || 'Invalid key.';
+          errEl.style.display = 'block';
+        }
+      } catch(e) {
+        errEl.textContent = 'Error verifying key: ' + e.message;
+        errEl.style.display = 'block';
+      }
+    }
+    document.getElementById('admin-key-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') unlockAdmin();
+    });
 
     function log(msg, type = '') {
       const area = document.getElementById('log-area');
