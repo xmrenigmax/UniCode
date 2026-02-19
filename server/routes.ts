@@ -33,10 +33,23 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  const isProduction = process.env.NODE_ENV === "production";
+
+  // Require SESSION_SECRET in production
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (isProduction && !sessionSecret) {
+    throw new Error("SESSION_SECRET environment variable is required in production");
+  }
+
   const PgSession = connectPgSimple(session);
   const sessionPool = new pg.Pool({
     connectionString: process.env.DATABASE_URL,
   });
+
+  // Trust proxy in production (needed for secure cookies behind Vercel/load balancers)
+  if (isProduction) {
+    app.set("trust proxy", 1);
+  }
 
   app.use(
     session({
@@ -45,14 +58,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tableName: "user_sessions",
         createTableIfMissing: true,
       }),
-      secret: process.env.SESSION_SECRET || "unigrade-fallback-secret-change-me",
+      secret: sessionSecret || "unigrade-dev-secret-local-only",
       resave: false,
       saveUninitialized: false,
       cookie: {
-        maxAge: 30 * 24 * 60 * 60 * 1000,
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
         httpOnly: true,
-        secure: false,
-        sameSite: "lax",
+        secure: isProduction, // HTTPS only in production
+        sameSite: isProduction ? "none" : "lax", // "none" needed for cross-origin mobile requests
       },
     }),
   );
