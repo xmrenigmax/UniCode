@@ -39,12 +39,12 @@ function stripProtocol(domain) {
 }
 
 function getDeploymentDomain() {
-  if (process.env.EXPO_PUBLIC_DOMAIN) {
-    return stripProtocol(process.env.EXPO_PUBLIC_DOMAIN);
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return stripProtocol(process.env.EXPO_PUBLIC_API_URL);
   }
 
   console.error(
-    "ERROR: No deployment domain found. Set EXPO_PUBLIC_DOMAIN to your server's domain (e.g., your-app.vercel.app)",
+    "ERROR: No deployment domain found. Set EXPO_PUBLIC_API_URL to your server's domain (e.g., your-app.vercel.app)",
   );
   process.exit(1);
 }
@@ -104,7 +104,7 @@ async function startMetro(expoPublicDomain) {
   }
 
   console.log("Starting Metro...");
-  console.log(`Setting EXPO_PUBLIC_DOMAIN=${expoPublicDomain}`);
+  console.log(`Setting EXPO_PUBLIC_API_URL=${expoPublicDomain}`);
   const env = {
     ...process.env,
     EXPO_PUBLIC_DOMAIN: expoPublicDomain,
