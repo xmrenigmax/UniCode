@@ -107,7 +107,7 @@ async function startMetro(expoPublicDomain) {
   console.log(`Setting EXPO_PUBLIC_API_URL=${expoPublicDomain}`);
   const env = {
     ...process.env,
-    EXPO_PUBLIC_DOMAIN: expoPublicDomain,
+    EXPO_PUBLIC_API_URL: expoPublicDomain,
   };
   metroProcess = spawn("npm", ["run", "expo:start:static:build"], {
     stdio: ["ignore", "pipe", "pipe"],
