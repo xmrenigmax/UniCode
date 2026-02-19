@@ -15,27 +15,28 @@ declare module "http" {
 
 function setupCors(app: express.Application) {
   app.use((req, res, next) => {
-    const origins = new Set<string>();
+    const origin = req.header("origin");
 
-    if (process.env.REPLIT_DEV_DOMAIN) {
-      origins.add(`https://${process.env.REPLIT_DEV_DOMAIN}`);
-    }
+    // Build allowed origins from environment
+    const allowedOrigins = new Set<string>();
 
-    if (process.env.REPLIT_DOMAINS) {
-      process.env.REPLIT_DOMAINS.split(",").forEach((d) => {
-        origins.add(`https://${d.trim()}`);
+    // Production domain (e.g., your Vercel deployment URL)
+    if (process.env.ALLOWED_ORIGINS) {
+      process.env.ALLOWED_ORIGINS.split(",").forEach((d) => {
+        allowedOrigins.add(d.trim());
       });
     }
 
-    const origin = req.header("origin");
-
-    // Allow localhost origins for Expo web development (any port)
+    // Allow localhost origins for Expo development (any port)
     const isLocalhost =
       origin?.startsWith("http://localhost:") ||
       origin?.startsWith("http://127.0.0.1:");
 
-    if (origin && (origins.has(origin) || isLocalhost)) {
-      res.header("Access-Control-Allow-Origin", origin);
+    // Mobile apps (React Native) send no origin header -- allow those through
+    const isMobileApp = !origin;
+
+    if (isMobileApp || (origin && (allowedOrigins.has(origin) || isLocalhost))) {
+      res.header("Access-Control-Allow-Origin", origin || "*");
       res.header(
         "Access-Control-Allow-Methods",
         "GET, POST, PUT, DELETE, OPTIONS",
